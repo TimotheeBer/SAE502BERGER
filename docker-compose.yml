@@ -1,0 +1,62 @@
+services:
+  # 1. Le Cerveau (Ansible)
+  control_node:
+    build: .
+    container_name: control_node
+    hostname: control_node
+    privileged: true
+    networks:
+      lab_net:
+        ipv4_address: 192.168.20.101
+    volumes:
+      - ./ansible_project:/root/ansible_project # Pour persister vos playbooks
+
+  # 2. Le Constructeur (Docker)
+  env_builder:
+    build: .
+    container_name: env_builder
+    hostname: env_builder
+    networks:
+      lab_net:
+        ipv4_address: 192.168.20.102
+    volumes:
+      # CRUCIAL : Permet à ce conteneur de piloter le Docker de l'hôte
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  # 3. L'Exécuteur de tests
+  test_runner:
+    build: .
+    container_name: test_runner
+    hostname: test_runner
+    networks:
+      lab_net:
+        ipv4_address: 192.168.20.103
+
+  # 4. Le Gestionnaire de Logs
+  logs_manager:
+    build: .
+    container_name: logs_manager
+    hostname: logs_manager
+    networks:
+      lab_net:
+        ipv4_address: 192.168.20.104
+    ports:
+      - "5601:5601" # Pour accéder à Kibana depuis votre PC réel
+
+  # 5. Le Dashboard
+  dashboard:
+    build: .
+    container_name: dashboard
+    hostname: dashboard
+    networks:
+      lab_net:
+        ipv4_address: 192.168.20.105
+    ports:
+      - "3000:3000" # Pour accéder à Grafana depuis votre PC réel
+
+networks:
+  lab_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.20.0/24
