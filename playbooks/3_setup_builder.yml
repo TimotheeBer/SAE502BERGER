@@ -1,0 +1,28 @@
+---
+- name: Configuration du Générateur d'Environnements
+  hosts: builders
+  become: yes    
+
+  tasks:
+    - name: 1. Installation des dépendances Python pour Docker
+      apt:
+        name: 
+          - python3-docker 
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: 2. Création du dossier de stockage des environnements
+      file:
+        path: /opt/environnements_test
+        state: directory
+        mode: '0755'
+
+    - name: 3. Test de connexion au Daemon Docker
+      command: docker info
+      register: docker_check
+      changed_when: false
+
+    - name: 4. Validation finale
+      debug:
+        msg: "Succès ! Le builder est connecté au Docker Host. (Server Version: {{ docker_check.stdout | regex_search('Server Version: (.+)', '\\1') | first }})"

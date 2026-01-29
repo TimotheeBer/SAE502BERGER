@@ -1,0 +1,43 @@
+---
+- name: Correction Config Loki
+  hosts: logs
+  become: yes
+  tasks:
+    - name: 1. Arrêter Loki (si jamais il tourne)
+      shell: "pkill -9 loki"
+      ignore_errors: yes
+
+    - name: 2. Écraser la config avec la bonne indentation
+      copy:
+        dest: /etc/loki-config.yaml
+        content: |
+          auth_enabled: false
+          server:
+            http_listen_port: 3100
+          common:
+            path_prefix: /tmp/loki
+            storage:
+              filesystem:
+                chunks_directory: /tmp/loki/chunks
+                rules_directory: /tmp/loki/rules
+            replication_factor: 1
+            ring:
+              instance_addr: 127.0.0.1
+              kvstore:
+                store: inmemory
+          schema_config:
+            configs:
+              - from: 2020-10-24
+                store: boltdb-shipper
+                object_store: filesystem
+                schema: v11
+                index:
+                  prefix: index_
+                  period: 24h
+
+    - name: 3. Relancer Loki proprement
+      shell: "nohup /usr/local/bin/loki -config.file=/etc/loki-config.yaml > /var/log/loki.log 2>&1 &"
+
+    - name: 4. Attendre le démarrage
+      pause:
+        seconds: 5

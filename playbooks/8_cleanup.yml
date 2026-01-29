@@ -1,0 +1,23 @@
+---
+- name: Nettoyage et Destruction de l'Environnement de Test
+  hosts: builders
+  become: yes
+  vars:
+    project_name: "webapp_demo"
+
+  tasks:
+    - name: 1. Arrêt et suppression des conteneurs
+      command: docker compose down -v
+      args:
+        chdir: "/opt/environnements_test/{{ project_name }}"
+      register: down_output
+      ignore_errors: yes 
+
+    - name: 2. Suppression du dossier de projet
+      file:
+        path: "/opt/environnements_test/{{ project_name }}"
+        state: absent
+
+    - name: 3. Confirmation
+      debug:
+        msg: "L'environnement {{ project_name }} a été détruit et les ressources libérées."

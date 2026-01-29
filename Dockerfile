@@ -26,6 +26,11 @@ RUN sed -i 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid
 
 RUN apt-get update && apt-get install -y ansible sshpass
 
+RUN mkdir -p /root/.ssh && \
+    ssh-keygen -t rsa -b 4096 -f /root/.ssh/id_rsa -N "" && \
+    chmod 600 /root/.ssh/id_rsa && \
+    chmod 644 /root/.ssh/id_rsa.pub
+
 EXPOSE 22
 
 CMD ["/usr/sbin/sshd", "-D"]

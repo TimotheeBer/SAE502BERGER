@@ -1,0 +1,99 @@
+---
+- name: Installation de la Stack de Logs (Loki + Grafana)
+  hosts: logs # Cible le .103 (ou .104 selon votre inventaire, vérifiez bien !)
+  become: yes
+  vars:
+    loki_version: "2.9.2"
+
+  tasks:
+    # --- PARTIE 1 : GRAFANA ---
+    - name: 1. Installation des prérequis
+      apt:
+        name: 
+          - software-properties-common
+          - wget
+          - unzip
+          - apt-transport-https
+        state: present
+
+    - name: 2. Ajout de la clé et du dépôt Grafana
+      shell: |
+        mkdir -p /etc/apt/keyrings/
+        wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor > /etc/apt/keyrings/grafana.gpg
+        echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list
+      args:
+        creates: /etc/apt/sources.list.d/grafana.list
+
+    - name: 3. Installation de Grafana
+      apt:
+        name: grafana
+        state: present
+        update_cache: yes
+
+    - name: 4. Configuration de la source de données Loki
+      copy:
+        dest: /etc/grafana/provisioning/datasources/loki_ds.yaml
+        content: |
+          apiVersion: 1
+          datasources:
+            - name: Loki
+              type: loki
+              access: proxy
+              url: http://localhost:3100
+              jsonData:
+                maxLines: 1000
+
+    - name: 5. Démarrage de Grafana (Mode sans Systemd)
+      # On lance le binaire directement en tâche de fond (nohup ... &)
+      shell: "nohup /usr/sbin/grafana-server --homepath=/usr/share/grafana --config=/etc/grafana/grafana.ini web > /var/log/grafana_startup.log 2>&1 &"
+      # On ignore l'erreur si c'est déjà lancé
+      ignore_errors: yes
+
+    - name: 6. Copie de l'archive Loki (Mode Local)
+      copy:
+        src: "loki-linux-amd64.zip"  # Le fichier est maintenant local
+        dest: "/tmp/loki.zip"
+
+    - name: 7. Installation du binaire Loki
+      shell: |
+        unzip -o /tmp/loki.zip -d /usr/local/bin/
+        mv /usr/local/bin/loki-linux-amd64 /usr/local/bin/loki
+        chmod +x /usr/local/bin/loki
+      args:
+        creates: /usr/local/bin/loki
+
+    - name: 8. Création de la configuration Loki
+      copy:
+        dest: /etc/loki-config.yaml
+        content: |
+          auth_enabled: false
+          server:
+            http_listen_port: 3100
+          common:
+            path_prefix: /tmp/loki
+            storage:
+              filesystem:
+                chunks_directory: /tmp/loki/chunks
+                rules_directory: /tmp/loki/rules
+              replication_factor: 1
+              instance_addr: 127.0.0.1
+            ring:
+              kvstore:
+                store: inmemory
+          schema_config:
+            configs:
+              - from: 2020-10-24
+                store: boltdb-shipper
+                object_store: filesystem
+                schema: v11
+                index:
+                  prefix: index_
+                  period: 24h
+
+    - name: 9. Démarrage de Loki (Mode sans Systemd)
+      shell: "nohup /usr/local/bin/loki -config.file=/etc/loki-config.yaml > /var/log/loki_startup.log 2>&1 &"
+      ignore_errors: yes
+
+    - name: 10. Fin
+      debug:
+        msg: "Stack Logs démarrée ! Grafana accessible sur http://192.168.20.104:3000 (admin/admin)"

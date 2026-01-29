@@ -1,0 +1,15 @@
+---
+- name: Initialisation des accès SSH
+  hosts: all_servers
+  gather_facts: no
+  vars:
+    ansible_user: root
+    ansible_ssh_pass: root
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+
+  tasks:
+    - name: Installation de la clé publique SSH
+      authorized_key:
+        user: root
+        state: present
+        key: "{{ lookup('file', '/root/.ssh/id_rsa.pub') }}"
